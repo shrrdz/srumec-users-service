@@ -59,8 +59,9 @@ fn handle_client(mut stream: TcpStream)
                 req if req.starts_with("GET /users/") => handle_get_request(req),
                 req if req.starts_with("GET /users") => handle_get_all_request(req),
                 req if req.starts_with("POST /users") => handle_post_request(req),
+                req if req.starts_with("PUT /users/") => handle_put_request(req),
 
-                // TODO: PUT, DELETE
+                // TODO: DELETE
 
                 _ => (NOT_FOUND.to_string(), "404 Not Found".to_string()),
             };
@@ -73,7 +74,7 @@ fn handle_client(mut stream: TcpStream)
     }
 }
 
-// get an individual user with the matching id
+// get a user with the matching id
 fn handle_get_request(request: &str) -> (String, String)
 {
     match (get_user_id(&request).parse::<i32>(), Client::connect(DB_URL.unwrap_or(""), NoTls))
@@ -116,6 +117,7 @@ fn handle_get_all_request(_request: &str) -> (String, String)
     }
 }
 
+// add a user
 fn handle_post_request(request: &str) -> (String, String)
 {
     match (get_user_request_body(&request), Client::connect(DB_URL.unwrap_or(""), NoTls))
@@ -125,6 +127,22 @@ fn handle_post_request(request: &str) -> (String, String)
             client.execute("INSERT INTO users (name) VALUES ($1)", &[&user.name]).unwrap();
 
             (OK_RESPONSE.to_string(), "User created successfully.".to_string())
+        }
+
+        _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
+    }
+}
+
+// update a user with the matching id
+fn handle_put_request(request: &str) -> (String, String)
+{
+    match (get_user_id(&request).parse::<i32>(), get_user_request_body(&request), Client::connect(DB_URL.unwrap_or(""), NoTls))
+    {
+        (Ok(id), Ok(user), Ok(mut client)) =>
+        {
+            client.execute("UPDATE users SET name = $1 WHERE id = $2", &[&user.name, &id]).unwrap();
+
+            (OK_RESPONSE.to_string(), "User updated successfully.".to_string())
         }
 
         _ => (INTERNAL_SERVER_ERROR.to_string(), "Error".to_string()),
